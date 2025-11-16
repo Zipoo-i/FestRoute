@@ -197,7 +197,12 @@ def update_event(event_id):
     
     for event in events:
         if event['id'] == event_id:
-            event.update(data)
+            event['name'] = data.get('name', event['name'])
+            event['start_time'] = data.get('start_time', event['start_time'])
+            event['end_time'] = data.get('end_time', event['end_time'])
+            event['location'] = data.get('location', event['location'])
+            event['duration'] = data.get('duration', event['duration'])
+            
             save_events(events)
             return jsonify(event)
     

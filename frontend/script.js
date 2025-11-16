@@ -165,10 +165,16 @@ async function addEvent() {
     const start_time = document.getElementById('event-start').value;
     const end_time = document.getElementById('event-end').value;
     const location = document.getElementById('event-location').value;
-    const duration = parseInt(document.getElementById('event-duration').value);
 
-    if (!name || !start_time || !end_time || !location || !duration) {
+    if (!name || !start_time || !end_time || !location) {
         alert('Заполните все поля');
+        return;
+    }
+
+    const duration = calculateDuration(start_time, end_time);
+    
+    if (duration <= 0) {
+        alert('Ошибка: время окончания должно быть позже времени начала');
         return;
     }
 
@@ -183,13 +189,12 @@ async function addEvent() {
 
         if (response.ok) {
             const newEvent = await response.json();
-            alert('Событие добавлено!');
+            alert('Событие добавлено! Продолжительность: ' + duration + ' мин.');
             loadEvents();
             document.getElementById('event-name').value = '';
             document.getElementById('event-start').value = '';
             document.getElementById('event-end').value = '';
             document.getElementById('event-location').value = '';
-            document.getElementById('event-duration').value = '';
         } else {
             const error = await response.json();
             alert(error.error);
@@ -221,27 +226,88 @@ async function deleteEvent(eventId) {
 }
 
 async function editEvent(eventId) {
-    const newName = prompt('Введите новое название события:');
-    if (newName) {
-        try {
-            const response = await fetch(`/events/${eventId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: newName })
-            });
-
-            if (response.ok) {
-                loadEvents();
-            } else {
-                const error = await response.json();
-                alert(error.error);
-            }
-        } catch (error) {
-            alert('Ошибка редактирования события: ' + error.message);
+    try {
+        const response = await fetch('/events');
+        const events = await response.json();
+        const event = events.find(e => e.id === eventId);
+        
+        if (!event) {
+            alert('Событие не найдено');
+            return;
         }
+        
+        const newName = prompt('Название события:', event.name);
+        if (!newName) return;
+        
+        const newStart = prompt('Время начала (HH:MM):', event.start_time);
+        if (!newStart) return;
+        
+        const newEnd = prompt('Время окончания (HH:MM):', event.end_time);
+        if (!newEnd) return;
+        
+        const newLocation = prompt('Место проведения:', event.location);
+        if (!newLocation) return;
+        
+        const duration = calculateDuration(newStart, newEnd);
+        
+        if (duration <= 0) {
+            alert('Ошибка: время окончания должно быть позже времени начала');
+            return;
+        }
+        
+        const updateResponse = await fetch(`/events/${eventId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: newName,
+                start_time: newStart,
+                end_time: newEnd,
+                location: newLocation,
+                duration: duration
+            })
+        });
+        
+        if (updateResponse.ok) {
+            alert('Событие обновлено! Продолжительность: ' + duration + ' мин.');
+            loadEvents();
+        } else {
+            const error = await updateResponse.json();
+            alert(error.error);
+        }
+    } catch (error) {
+        alert('Ошибка редактирования: ' + error.message);
     }
+}
+
+function calculateDuration(startTime, endTime) {
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    
+    if (!start || !end) return 0;
+    
+    let duration = (end.hours * 60 + end.minutes) - (start.hours * 60 + start.minutes);
+    
+    if (duration < 0) {
+        duration += 24 * 60;
+    }
+    
+    return duration;
+}
+
+function parseTime(timeStr) {
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    
+    const hours = parseInt(match[1]);
+    const minutes = parseInt(match[2]);
+    
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return null;
+    }
+    
+    return { hours, minutes };
 }
 
 function showAuthInterface() {
